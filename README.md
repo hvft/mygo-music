@@ -4,7 +4,7 @@ A native desktop music player written in Go with [MyGo](https://github.com/egois
 
 ## Features
 
-- Local files (MP3, FLAC, Ogg Vorbis, WAV, and ALAC, FLAC or AAC in .m4a and .aac) with tags, covers and `.lrc` lyrics
+- Local files (MP3, FLAC, Ogg Vorbis, Ogg Opus, WAV, and ALAC, FLAC or AAC in .m4a and .aac) with tags, covers and `.lrc` lyrics
 - Playlists, liked songs, search, albums and artists
 - Now Playing with lyric stage styles, cover wall, queue, shuffle and repeat
 - Notch player on macOS, tray, media keys
@@ -100,7 +100,7 @@ Export a function for each thing the plugin does. Each takes one object of param
 | `likeComment` | `{trackId, commentId, on}` | |
 | `postComment` | `{trackId, text}` | `Comment` |
 | `lyrics` | `{id}` | `{lrc, translation}`, or `{lines}` with timed `words` |
-| `stream` | `{id, quality}` | `{url, type, headers, size, gain, peak}`, where `type` is `mp3`, `flac`, `ogg`, `wav`, `m4a` (ALAC, FLAC or AAC-LC, whole or in fragments as a DASH stream serves it) or `aac` (AAC-LC in ADTS) |
+| `stream` | `{id, quality}` | `{url, type, headers, size, gain, peak}`, where `type` is `mp3`, `flac`, `ogg`, `opus`, `wav`, `m4a` (ALAC, FLAC or AAC-LC, whole or in fragments as a DASH stream serves it) or `aac` (AAC-LC in ADTS) |
 | `remotePlay` | `{ids, start, position}` | |
 | `remotePause`, `remoteResume` | | |
 | `remoteSeek` | `{position}` | |

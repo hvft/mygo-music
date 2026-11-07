@@ -202,3 +202,57 @@ func oggDuration(r io.ReaderAt, size int64) (ms int64) {
 	}
 	return d.Length() * 1000 / int64(d.SampleRate())
 }
+
+// opusDuration reads an Ogg Opus file's milliseconds from its last page,
+// whose granule position is where the sound ends: 48 kHz frames from the
+// start, less the padding the encoder put before it.
+func opusDuration(r io.ReaderAt, size int64) int64 {
+	g, ok := lastOggGranule(r, size)
+	if !ok {
+		return 0
+	}
+	if pre := opusPreSkip(r); g > pre {
+		return (g - pre) * 1000 / 48000
+	}
+	return 0
+}
+
+// opusPreSkip is the frames at 48 kHz an Ogg Opus file's encoder put before
+// the sound, as its first page says.
+func opusPreSkip(r io.ReaderAt) int64 {
+	if h := opusHead(r); h != nil {
+		return int64(binary.LittleEndian.Uint16(h[10:12]))
+	}
+	return 0
+}
+
+// lastOggGranule finds the granule position of an Ogg file's last page, which
+// ends where the file does. A page is at most 27 + 255 + 255*255 bytes, so the
+// last of them starts within that much of the end.
+func lastOggGranule(r io.ReaderAt, size int64) (int64, bool) {
+	n := min(size, int64(27+255+255*255))
+	b := make([]byte, n)
+	if _, err := r.ReadAt(b, size-n); err != nil && err != io.EOF {
+		return 0, false
+	}
+	for i := len(b) - 27; i >= 0; i-- {
+		if string(b[i:i+4]) != "OggS" || b[i+4] != 0 {
+			continue
+		}
+		segs := int(b[i+26])
+		if i+27+segs > len(b) {
+			continue
+		}
+		length := 27 + segs
+		for _, l := range b[i+27 : i+27+segs] {
+			length += int(l)
+		}
+		if i+length != len(b) {
+			continue // not where the file ends: bytes that only look like a page
+		}
+		if g := int64(binary.LittleEndian.Uint64(b[i+6 : i+14])); g >= 0 {
+			return g, true
+		}
+	}
+	return 0, false
+}

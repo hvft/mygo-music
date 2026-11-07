@@ -158,5 +158,20 @@ func m4aTrack(r io.ReaderAt, size int64) (*mp4.Track, bool) {
 	return t, true
 }
 
+// opusHead reads an Ogg Opus file's OpusHead, the packet of its first page,
+// which says its channels and the padding before its sound: nil if the file
+// isn't one.
+func opusHead(r io.ReaderAt) []byte {
+	var h [27]byte
+	if _, err := r.ReadAt(h[:], 0); err != nil || string(h[:4]) != "OggS" {
+		return nil
+	}
+	head := make([]byte, 19)
+	if _, err := r.ReadAt(head, 27+int64(h[26])); err != nil || string(head[:8]) != "OpusHead" {
+		return nil
+	}
+	return head
+}
+
 // lossless says whether an .m4a's track is ALAC's or FLAC's.
 func lossless(t *mp4.Track) bool { return t.Codec == "alac" || t.Codec == "fLaC" }

@@ -1287,6 +1287,41 @@ func TestScanFindsOgg(t *testing.T) {
 	}
 }
 
+// An Ogg Opus file is found like the others, with its tags and length, and
+// plays as what it is, whatever it's named.
+func TestScanFindsOpus(t *testing.T) {
+	dir := t.TempDir()
+	b := fixture(t, "seek.opus")
+	for _, name := range []string{"a.opus", "b.ogg"} {
+		if err := os.WriteFile(filepath.Join(dir, name), b, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s := scanned(t, dir)
+	r, err := s.Search("Opus Title", music.SearchTracks, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Tracks) != 2 {
+		t.Fatalf("found %d tracks", len(r.Tracks))
+	}
+	for _, tr := range r.Tracks {
+		if tr.Name != "Opus Title" || tr.ArtistNames() != "Opus Artist" || tr.Album.Name != "Opus Album" {
+			t.Errorf("tags: %+v", tr)
+		}
+		if tr.Duration < 4900 || tr.Duration > 5100 {
+			t.Errorf("duration: %d", tr.Duration)
+		}
+		st, err := s.Stream(tr.ID, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if st.Type != "opus" {
+			t.Errorf("type: %s", st.Type)
+		}
+	}
+}
+
 // Tags read in the wrong encoding come back as what was written: GBK and UTF-8
 // that the library took for Latin-1 or left as bytes, while real Latin-1 stays.
 func TestDecodeLegacy(t *testing.T) {

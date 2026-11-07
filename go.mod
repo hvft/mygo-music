@@ -11,6 +11,7 @@ require (
 	github.com/egoist/mygo v0.8.4-0.20261107092838-4219d257423d
 	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/jfreymuth/oggvorbis v1.0.5
+	github.com/pion/opus v0.1.0
 	github.com/tphakala/go-aac v0.7.1
 	golang.org/x/image v0.46.0
 	golang.org/x/text v0.43.0

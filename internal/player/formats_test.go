@@ -222,6 +222,71 @@ func TestADTS(t *testing.T) {
 	}
 }
 
+// An Ogg Opus file plays at the 48 kHz Opus decodes at, and as long as its
+// last page says its sound is: the frames its granule counts, less the padding
+// the encoder put before it, and none of what it put after. A seek lands on
+// the frame it's asked for.
+func TestOpus(t *testing.T) {
+	b := readFixture(t, "seek.opus")
+	s, err := openStream(downloaded(b), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.SampleRate() != 48000 || s.Len() != 5*48000 {
+		t.Fatalf("rate %d, length %d", s.SampleRate(), s.Len())
+	}
+	got := decodeAll(t, b)
+	if len(got) != 5*48000*2 {
+		t.Fatalf("decoded %d samples", len(got))
+	}
+	// What decodes is the song, not the silence of a decoder that failed.
+	var peak float32
+	for _, v := range got {
+		peak = max(peak, float32(math.Abs(float64(v))))
+	}
+	if peak < 0.3 {
+		t.Fatalf("peak %f", peak)
+	}
+	seekLands(t, b, got, 0.001, 0, 1, 4096, 50000, 123457)
+}
+
+// A mono Opus file plays in both ears.
+func TestMonoOpus(t *testing.T) {
+	got := decodeAll(t, readFixture(t, "seek-mono.opus"))
+	if len(got) != 5*48000*2 {
+		t.Fatalf("decoded %d samples", len(got))
+	}
+	for i := 0; i < len(got); i += 2 {
+		if got[i] != got[i+1] {
+			t.Fatalf("frame %d: %f and %f", i/2, got[i], got[i+1])
+		}
+	}
+}
+
+// An Opus file still coming in plays right away, with the length its source
+// says, and plays the same sound as one whose pages are all in.
+func TestOpusComingIn(t *testing.T) {
+	b := readFixture(t, "seek.opus")
+	got := decodeAll(t, b)
+	dl := downloaded(b)
+	dl.n, dl.done = 30<<10, false
+	s, err := openStream(dl, 5000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Len() != 5*48000 {
+		t.Fatalf("length %d: not what the source said", s.Len())
+	}
+	buf := make([]float32, 4096)
+	n, err := s.Read(buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d := maxDiff(buf[:n], got); d > 0.05 {
+		t.Errorf("off by up to %.4f", d)
+	}
+}
+
 // wavFile makes a WAV of the format tag, channels and bits given, holding
 // data, with a LIST chunk before it as some writers put there.
 func wavFile(tag, channels, bits, rate int, data []byte) []byte {

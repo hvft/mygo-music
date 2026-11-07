@@ -255,6 +255,13 @@ func (d *download) waitFor(n int64) int64 {
 	return d.n
 }
 
+// received returns how many bytes are in, and whether they're all of them.
+func (d *download) received() (n int64, done bool) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.n, d.done
+}
+
 // readAt reads into b what is in from off, as much as fits. Its caller
 // holds the lock.
 func (d *download) readAt(b []byte, off int64) (int, error) {
@@ -331,9 +338,9 @@ type stream interface {
 	source() (*download, *spectrum)
 }
 
-// openStream opens the song dl fetches, MP3, FLAC, Ogg Vorbis, WAV, AAC, or
-// ALAC or AAC in an MP4, as its first bytes say. An MP3 says nothing of its
-// length, nor does AAC still coming in: durationMs is it.
+// openStream opens the song dl fetches, MP3, FLAC, Ogg Vorbis or Opus, WAV,
+// AAC, or ALAC or AAC in an MP4, as its first bytes say. An MP3 says nothing
+// of its length, nor does AAC still coming in: durationMs is it.
 func openStream(dl *download, durationMs int64) (stream, error) {
 	dl.waitFor(12)
 	if head := dl.peek(0, 12); len(head) == 12 {
@@ -351,6 +358,9 @@ func openStream(dl *download, durationMs int64) (stream, error) {
 		case "fLaC":
 			return openFLACStream(dl)
 		case "OggS":
+			if oggOpus(dl) {
+				return openOpusStream(dl, durationMs)
+			}
 			return openOggStream(dl, durationMs)
 		}
 		if _, _, ok := adtsHeader(head); ok {
@@ -358,6 +368,21 @@ func openStream(dl *download, durationMs int64) (stream, error) {
 		}
 	}
 	return openMP3Stream(dl, durationMs)
+}
+
+// oggOpus says whether the Ogg stream dl fetches holds Opus, whose first
+// packet says so, or Vorbis.
+func oggOpus(dl *download) bool {
+	dl.waitFor(27)
+	h := dl.peek(0, 27)
+	if len(h) < 27 {
+		return false
+	}
+	at := 27 + int64(h[26])
+	if dl.waitFor(at+8) < at+8 {
+		return false
+	}
+	return string(dl.peek(at, 8)) == "OpusHead"
 }
 
 // openShared opens a second stream of what dl fetches, for decoding apart
@@ -376,6 +401,8 @@ func openShared(dl *download, durationMs int64) (stream, error) {
 	case *mp3Stream:
 		s.spec, s.drop = nil, dl.release
 	case *oggStream:
+		s.spec, s.drop = nil, dl.release
+	case *opusStream:
 		s.spec, s.drop = nil, dl.release
 	case *wavStream:
 		s.spec, s.drop = nil, dl.release
